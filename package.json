@@ -1,0 +1,13 @@
+{
+  "name": "csvreader",
+  "version": "0.1.0",
+  "description": "A CSV file utility to determine the field structure, datatypes and sizes and optionally generate a MySQL or Postgres table creation SQL.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module"
+}
