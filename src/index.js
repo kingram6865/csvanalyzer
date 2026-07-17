@@ -36,6 +36,7 @@ export async function analyzeCsv(
     csv = {},
     writeSqlFile = false,
     sqlFilePath = null,
+    sqlFileName = null,
     ...analysisOptions
   } = {},
 ) {
@@ -63,9 +64,14 @@ export async function analyzeCsv(
 
   const writer = new SqlFileWriter();
 
+  const parsedInputPath = path.parse(filePath);
+  const outputDirectory = sqlFilePath ?? parsedInputPath.dir;
+  const outputFileName = sqlFileName ?? `${parsedInputPath.name}.sql`;
+
+
   const writtenSqlFilePath = await writer.write(
     result.sql,
-    sqlFilePath ?? getDefaultSqlFilePath(filePath),
+    path.join(outputDirectory, outputFileName),
   );
 
 
