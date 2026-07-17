@@ -1,18 +1,60 @@
 import { analyzeCsv } from './src/index.js';
 
-const filePath = process.argv[2];
-const writeSqlFile = process.argv[3];
+const args = process.argv.slice(2);
+const filePath = args[0];
 
-if (!filePath) {
-  console.error('Usage: node analyzeCsv.js <csv-file>');
+function getOptionValue(optionName) {
+  const optionIndex = args.indexOf(optionName);
+
+  if (optionIndex === -1) {
+    return null;
+  }
+
+  const value = args[optionIndex + 1];
+
+  if (!value || value.startsWith('--')) {
+    throw new Error(`${optionName} requires a value.`);
+  }
+
+  return value;
+}
+
+if (!filePath || filePath.startsWith('--')) {
+  console.error(
+    'Usage: node analyzeCsv.js <csv-file> ' +
+    '[--write-sql] ' +
+    '[--sql-path <directory>] ' +
+    '[--sql-file-name <filename.sql>]',
+  );
+
   process.exit(1);
 }
 
+// const writeSqlFile = sqlFilePath !== null;
+// const sqlFilePath = process.argv[3] ?? null;
+//
+// if (!filePath) {
+//   console.error('Usage: node analyzeCsv.js <csv-file>');
+//   process.exit(1);
+// }
+
 try {
+  const writeSqlFile = args.includes('--write-sql');
+  const sqlFilePath = getOptionValue('--sql-path');
+  const sqlFileName = getOptionValue('--sql-file-name');
+
+  if ((sqlFilePath || sqlFileName) && !writeSqlFile) {
+    throw new Error(
+      '--sql-path and --sql-file-name require --write-sql.',
+    );
+  }
+
   const result = await analyzeCsv(filePath, {
       dialect: 'mysql',
       writeSqlFile,
-      maxRows: 10000,
+      sqlFilePath,
+      sqlFileName,
+      maxRows: Infinity,
       inferNotNull: false,
       maximumExamples: 3,
       // csv: {
@@ -21,6 +63,8 @@ try {
       // },
     },
   );
+
+  console.log(`\nTable name: ${result.tableName}`);
 
   console.table(
     result.columns.map((column) => ({
@@ -34,13 +78,18 @@ try {
     })),
   );
 
-  console.log(`\nTable name: ${result.tableName}`);
-  console.log(`SQL file: ${result.sqlFilePath}`);
+  console.log('\nGenerated SQL:\n');
   console.log(result.sql);
+  console.log(`Rows of data: ${result.rowsAnalyzed}`)
+  // if (result.sqlFilePath) {
+  //   console.log(`SQL file: ${result.sqlFilePath}`);
+  // }
 } catch (error) {
-  console.error(
-    `Unable to analyze CSV: ${error.message}`,
-  );
+  const message =
+    error instanceof Error
+      ? error.message
+      : String(error);
 
+  console.error(`Unable to analyze CSV: ${message}`);
   process.exit(1);
 }
