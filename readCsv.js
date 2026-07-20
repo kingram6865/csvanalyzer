@@ -2,6 +2,11 @@ import { analyzeCsv } from './src/index.js';
 
 const args = process.argv.slice(2);
 const filePath = args[0];
+const supportedOptions = new Set([
+  '--write-sql',
+  '--sql-path',
+  '--sql-file-name',
+]);
 
 function getOptionValue(optionName) {
   const optionIndex = args.indexOf(optionName);
@@ -21,7 +26,7 @@ function getOptionValue(optionName) {
 
 if (!filePath || filePath.startsWith('--')) {
   console.error(
-    'Usage: node analyzeCsv.js <csv-file> ' +
+    'Usage: node readCsv.js <csv-file> ' +
     '[--write-sql] ' +
     '[--sql-path <directory>] ' +
     '[--sql-file-name <filename.sql>]',
@@ -39,6 +44,16 @@ if (!filePath || filePath.startsWith('--')) {
 // }
 
 try {
+  const unknownOption = args.find(
+    (argument) =>
+      argument.startsWith('--') &&
+      !supportedOptions.has(argument),
+  );
+
+  if (unknownOption) {
+    throw new Error(`Unknown option: ${unknownOption}`);
+  }
+
   const writeSqlFile = args.includes('--write-sql');
   const sqlFilePath = getOptionValue('--sql-path');
   const sqlFileName = getOptionValue('--sql-file-name');
