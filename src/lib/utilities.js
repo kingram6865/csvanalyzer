@@ -1,5 +1,6 @@
 const supportedOptions = new Map([
   ['--write-sql', { property: 'writeSqlFile', requiresValue: false, },],
+  ['--execute-sql', { property: 'databaseContextName', requiresValue: true, },],
   ['--sql-path', { property: 'sqlFilePath', requiresValue: true, },],
   ['--sql-file-name', { property: 'sqlFileName', requiresValue: true, },],
 ]);
@@ -8,6 +9,7 @@ export function parseArguments(args) {
   const parsedArguments = {
     csvFilePath: null,
     writeSqlFile: false,
+    executeSql: false,
     sqlFilePath: null,
     sqlFileName: null,
   };
