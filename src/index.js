@@ -40,6 +40,21 @@ export async function analyzeCsv(
     ...analysisOptions
   } = {},
 ) {
+  if (
+    sqlFileName !== null &&
+    (
+      sqlFileName.length === 0 ||
+      sqlFileName === '.' ||
+      sqlFileName === '..' ||
+      path.posix.basename(sqlFileName) !== sqlFileName ||
+      path.win32.basename(sqlFileName) !== sqlFileName
+    )
+  ) {
+    throw new Error(
+      'sqlFileName must contain a filename only, not a path.',
+    );
+  }
+
   const analyzer = createCsvSchemaAnalyzer({
     reader: new CsvFileReader(csv),
   });
@@ -68,12 +83,14 @@ export async function analyzeCsv(
   const outputDirectory = sqlFilePath ?? parsedInputPath.dir;
   const outputFileName = sqlFileName ?? `${parsedInputPath.name}.sql`;
 
+  if (sqlFileName !== null && path.basename(sqlFileName) !== sqlFileName) {
+    throw new Error('--sql-file-name must contain a filename only.',);
+  }
 
   const writtenSqlFilePath = await writer.write(
     result.sql,
     path.join(outputDirectory, outputFileName),
   );
-
 
   return {
     ...result,
