@@ -4,6 +4,7 @@ import { parseArguments } from './src/lib/utilities.js';
 const usage =
   'Usage: node readCsv.js <csv-file> ' +
   '[--write-sql] ' +
+  '[--execute-sql] ' +
   '[--sql-path <directory>] ' +
   '[--sql-file-name <filename.sql>]';
 
@@ -11,6 +12,7 @@ try {
   const {
     csvFilePath,
     writeSqlFile,
+    executeSql,
     sqlFilePath,
     sqlFileName,
   } = parseArguments(process.argv.slice(2));
@@ -27,7 +29,7 @@ try {
   }
 
   const result = await analyzeCsv(csvFilePath, {
-      dialect: 'mysql',
+      dialect: 'postgres',
       writeSqlFile,
       sqlFilePath,
       sqlFileName,
@@ -50,6 +52,8 @@ try {
       emptyValues: column.emptyCount,
     })),
   );
+
+  console.log(result.sql);
 
   if (result.sqlFilePath) {
     console.log(`SQL file: ${result.sqlFilePath}`);
