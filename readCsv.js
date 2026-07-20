@@ -57,14 +57,11 @@ try {
       maxRows: Infinity,
       inferNotNull: false,
       maximumExamples: 3,
-      // csv: {
-      //   delimiter: ',',
-      //   quote: '"',
-      // },
     },
   );
 
-  console.log(`\nTable name: ${result.tableName}`);
+  // console.log(`\nTable name: ${result.tableName}`);
+  console.log(`Table name: ${result.tableName.padEnd(35, ' ')} with ${result.rowsAnalyzed.toString().padEnd(12, ' ')} rows of data`);
 
   console.table(
     result.columns.map((column) => ({
@@ -78,12 +75,9 @@ try {
     })),
   );
 
-  console.log('\nGenerated SQL:\n');
-  console.log(result.sql);
-  console.log(`Rows of data: ${result.rowsAnalyzed}`)
-  // if (result.sqlFilePath) {
-  //   console.log(`SQL file: ${result.sqlFilePath}`);
-  // }
+  if (result.sqlFilePath) {
+    console.log(`SQL file: ${result.sqlFilePath}`);
+  }
 } catch (error) {
   const message =
     error instanceof Error
