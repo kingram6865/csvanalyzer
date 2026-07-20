@@ -1,8 +1,6 @@
 import { analyzeCsv } from './src/index.js';
 import { parseArguments } from './src/lib/utilities.js';
 
-const args = process.argv.slice(2);
-
 const usage =
   'Usage: node readCsv.js <csv-file> ' +
   '[--write-sql] ' +
