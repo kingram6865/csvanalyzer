@@ -83,10 +83,6 @@ export async function analyzeCsv(
   const outputDirectory = sqlFilePath ?? parsedInputPath.dir;
   const outputFileName = sqlFileName ?? `${parsedInputPath.name}.sql`;
 
-  if (sqlFileName !== null && path.basename(sqlFileName) !== sqlFileName) {
-    throw new Error('--sql-file-name must contain a filename only.',);
-  }
-
   const writtenSqlFilePath = await writer.write(
     result.sql,
     path.join(outputDirectory, outputFileName),
