@@ -41,7 +41,7 @@ export function parseArguments(args) {
       throw new Error(`Unexpected argument: ${argument}`);
     }
 
-    parsedArguments.filePath = argument;
+    parsedArguments.csvFilePath = argument;
   }
 
   return parsedArguments;
