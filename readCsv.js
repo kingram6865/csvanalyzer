@@ -1,62 +1,26 @@
 import { analyzeCsv } from './src/index.js';
+import { parseArguments } from './src/lib/utilities.js';
 
 const args = process.argv.slice(2);
-const filePath = args[0];
-const supportedOptions = new Set([
-  '--write-sql',
-  '--sql-path',
-  '--sql-file-name',
-]);
 
-function getOptionValue(optionName) {
-  const optionIndex = args.indexOf(optionName);
-
-  if (optionIndex === -1) {
-    return null;
-  }
-
-  const value = args[optionIndex + 1];
-
-  if (!value || value.startsWith('--')) {
-    throw new Error(`${optionName} requires a value.`);
-  }
-
-  return value;
-}
-
-if (!filePath || filePath.startsWith('--')) {
-  console.error(
-    'Usage: node readCsv.js <csv-file> ' +
-    '[--write-sql] ' +
-    '[--sql-path <directory>] ' +
-    '[--sql-file-name <filename.sql>]',
-  );
-
-  process.exit(1);
-}
-
-// const writeSqlFile = sqlFilePath !== null;
-// const sqlFilePath = process.argv[3] ?? null;
-//
-// if (!filePath) {
-//   console.error('Usage: node analyzeCsv.js <csv-file>');
-//   process.exit(1);
-// }
+const usage =
+  'Usage: node readCsv.js <csv-file> ' +
+  '[--write-sql] ' +
+  '[--sql-path <directory>] ' +
+  '[--sql-file-name <filename.sql>]';
 
 try {
-  const unknownOption = args.find(
-    (argument) =>
-      argument.startsWith('--') &&
-      !supportedOptions.has(argument),
-  );
+  const {
+    csvFilePath,
+    writeSqlFile,
+    sqlFilePath,
+    sqlFileName,
+  } = parseArguments(process.argv.slice(2));
 
-  if (unknownOption) {
-    throw new Error(`Unknown option: ${unknownOption}`);
+  if (!csvFilePath) {
+    console.error(usage);
+    process.exit(1);
   }
-
-  const writeSqlFile = args.includes('--write-sql');
-  const sqlFilePath = getOptionValue('--sql-path');
-  const sqlFileName = getOptionValue('--sql-file-name');
 
   if ((sqlFilePath || sqlFileName) && !writeSqlFile) {
     throw new Error(
@@ -64,7 +28,7 @@ try {
     );
   }
 
-  const result = await analyzeCsv(filePath, {
+  const result = await analyzeCsv(csvFilePath, {
       dialect: 'mysql',
       writeSqlFile,
       sqlFilePath,
@@ -75,7 +39,6 @@ try {
     },
   );
 
-  // console.log(`\nTable name: ${result.tableName}`);
   console.log(`Table name: ${result.tableName.padEnd(35, ' ')} with ${result.rowsAnalyzed.toString().padEnd(12, ' ')} rows of data`);
 
   console.table(
