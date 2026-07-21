@@ -1,10 +1,10 @@
-import { analyzeCsv } from './src/index.js';
+import { analyzeCsv, SqlExecutor } from './src/index.js';
 import { parseArguments } from './src/lib/utilities.js';
 
 const usage =
   'Usage: node readCsv.js <csv-file> ' +
   '[--write-sql] ' +
-  '[--execute-sql] ' +
+  '[--execute-sql <database-context>] ' +
   '[--sql-path <directory>] ' +
   '[--sql-file-name <filename.sql>]';
 
@@ -12,7 +12,7 @@ try {
   const {
     csvFilePath,
     writeSqlFile,
-    executeSql,
+    databaseContextName,
     sqlFilePath,
     sqlFileName,
   } = parseArguments(process.argv.slice(2));
@@ -28,8 +28,12 @@ try {
     );
   }
 
+  const sqlExecutor = databaseContextName
+    ? new SqlExecutor().setContext(databaseContextName)
+    : null;
+
   const result = await analyzeCsv(csvFilePath, {
-      dialect: 'postgres',
+      dialect: sqlExecutor?.getDialect() ?? 'postgres',
       writeSqlFile,
       sqlFilePath,
       sqlFileName,
@@ -58,12 +62,21 @@ try {
   if (result.sqlFilePath) {
     console.log(`SQL file: ${result.sqlFilePath}`);
   }
+
+  if (sqlExecutor) {
+    const execution = await sqlExecutor.execute(result.sql);
+
+    console.log(
+      `Executed SQL using database context ` +
+      `"${execution.contextName}" (${execution.dialect}).`,
+    );
+  }
 } catch (error) {
   const message =
     error instanceof Error
       ? error.message
       : String(error);
 
-  console.error(`Unable to analyze CSV: ${message}`);
+  console.error(`csvreader failed: ${message}`);
   process.exit(1);
 }
