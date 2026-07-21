@@ -9,7 +9,7 @@ export function parseArguments(args) {
   const parsedArguments = {
     csvFilePath: null,
     writeSqlFile: false,
-    executeSql: false,
+    databaseContextName: null,
     sqlFilePath: null,
     sqlFileName: null,
   };
