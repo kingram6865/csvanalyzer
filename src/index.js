@@ -4,7 +4,10 @@ import { CsvFileReader } from './lib/CsvFileReader.js';
 import { CsvSchemaAnalyzer } from './lib/CsvSchemaAnalyzer.js';
 import { SqlFileWriter } from './lib/SqlFileWriter.js';
 import { ValueTypeInferer } from './lib/ValueTypeInferer.js';
-import { MySqlDialect, PostgresDialect, } from './lib/SqlDialects.js';
+import { MySqlDialect, PostgresDialect, SqliteDialect, } from './lib/SqlDialects.js';
+import { SqlExecutor } from './lib/SqlExecutor.js';
+export { SqlExecutor };
+
 
 function getDefaultSqlFilePath(filePath) {
   const parsedPath = path.parse(filePath);
@@ -21,6 +24,7 @@ export function createCsvSchemaAnalyzer({
   dialects = {
     mysql: new MySqlDialect(),
     postgres: new PostgresDialect(),
+    sqlite: new SqliteDialect(),
   },
 } = {}) {
   return new CsvSchemaAnalyzer({
