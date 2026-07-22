@@ -5,18 +5,6 @@ import { CsvSchemaAnalyzer } from './lib/CsvSchemaAnalyzer.js';
 import { SqlFileWriter } from './lib/SqlFileWriter.js';
 import { ValueTypeInferer } from './lib/ValueTypeInferer.js';
 import { MySqlDialect, PostgresDialect, SqliteDialect, } from './lib/SqlDialects.js';
-import { SqlExecutor } from './lib/SqlExecutor.js';
-export { SqlExecutor };
-
-
-function getDefaultSqlFilePath(filePath) {
-  const parsedPath = path.parse(filePath);
-
-  return path.join(
-    parsedPath.dir,
-    `${parsedPath.name}.sql`,
-  );
-}
 
 export function createCsvSchemaAnalyzer({
   reader = new CsvFileReader(),
