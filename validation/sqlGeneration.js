@@ -1,30 +1,14 @@
-// [ADDED]
-// Use Node's temporary-directory utilities so the validation does not
-// leave a test CSV inside the repository.
-import {
-  mkdtemp,
-  rm,
-  writeFile,
-} from 'node:fs/promises';
-
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-
-// [ADDED]
-// analyzeCsv() is the public orchestration function being validated.
 import { analyzeCsv } from '../src/index.js';
 
-// [ADDED]
-// Small assertion helper so each failure reports the specific SQL
-// behavior that did not match expectations.
 function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
   }
 }
 
-// [ADDED]
-// Verify that generated SQL contains an expected fragment.
 function assertContains(sql, fragment, dialect) {
   assert(
     sql.includes(fragment),
@@ -32,9 +16,6 @@ function assertContains(sql, fragment, dialect) {
   );
 }
 
-// [ADDED]
-// Verify that generated SQL does not contain a fragment belonging to
-// another database engine.
 function assertDoesNotContain(sql, fragment, dialect) {
   assert(
     !sql.includes(fragment),
@@ -42,8 +23,6 @@ function assertDoesNotContain(sql, fragment, dialect) {
   );
 }
 
-// [ADDED]
-// Create an isolated directory for the validation CSV.
 const temporaryDirectory = await mkdtemp(
   path.join(os.tmpdir(), 'csvreader-validation-'),
 );
@@ -54,9 +33,6 @@ const csvFilePath = path.join(
 );
 
 try {
-  // [ADDED]
-  // These values exercise integer, decimal, boolean, timezone-aware
-  // datetime, and string inference.
   const csv = [
     'id,amount,active,created_at,description',
     '1,12.50,true,2026-07-21T12:00:00Z,Alpha',
@@ -69,8 +45,6 @@ try {
     'utf8',
   );
 
-  // [ADDED]
-  // Generate PostgreSQL SQL through the registered postgres dialect.
   const postgresResult = await analyzeCsv(
     csvFilePath,
     {
@@ -110,8 +84,6 @@ try {
 
   console.log('PostgreSQL generation passed');
 
-  // [ADDED]
-  // Generate MySQL SQL through the registered mysql dialect.
   const mysqlResult = await analyzeCsv(
     csvFilePath,
     {
@@ -137,9 +109,6 @@ try {
     'MySQL',
   );
 
-  // [ADDED]
-  // The existing MySQL dialect preserves timezone-bearing datetimes
-  // as text because MySQL DATETIME does not retain timezone offsets.
   assertContains(
     mysqlResult.sql,
     '`created_at` VARCHAR(40) NOT NULL',
@@ -154,8 +123,6 @@ try {
 
   console.log('MySQL generation passed');
 
-  // [ADDED]
-  // Generate SQLite SQL through the newly registered sqlite dialect.
   const sqliteResult = await analyzeCsv(
     csvFilePath,
     {
@@ -175,35 +142,50 @@ try {
     'SQLite',
   );
 
-  // [ADDED]
-  // SQLite stores booleans using INTEGER affinity.
   assertContains(
     sqliteResult.sql,
     '"active" INTEGER NOT NULL',
     'SQLite',
   );
 
-  // [ADDED]
-  // SQLite preserves date and datetime source values as TEXT.
   assertContains(
     sqliteResult.sql,
     '"created_at" TEXT NOT NULL',
     'SQLite',
   );
 
-  assertDoesNotContain(
-    sqliteResult.sql,
-    'ENGINE=InnoDB',
-    'SQLite',
-  );
+  assertDoesNotContain(sqliteResult.sql, 'ENGINE=InnoDB', 'SQLite');
 
   console.log('SQLite generation passed');
 
+  try {
+    await analyzeCsv(
+      csvFilePath,
+      {
+        dialect: 'toString',
+      },
+    );
+
+    throw new Error(
+      'Inherited dialect validation did not run.',
+    );
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      !error.message.startsWith(
+        'Unsupported SQL dialect: toString.',
+      )
+    ) {
+      throw error;
+    }
+
+    console.log(
+      'Inherited dialect validation passed',
+    );
+  }
+
   console.log('SQL dialect generation passed');
 } finally {
-  // [ADDED]
-  // Remove the temporary directory and CSV whether validation succeeds
-  // or an assertion throws.
   await rm(
     temporaryDirectory,
     {
