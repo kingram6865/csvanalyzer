@@ -1,10 +1,19 @@
 {
   "name": "csvreader",
   "version": "0.1.0",
-  "description": "A CSV file utility to determine the field structure, datatypes and sizes and optionally generate a MySQL or Postgres table creation SQL.",
+  "description": "A CSV schema analysis utility that infers column types and generates or executes CREATE TABLE SQL for PostgreSQL, MySQL, and SQLite.",
   "main": "./src/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "check": "find . -path \"*/node_modules\" -prune -o -type f -name \"*.js\" -exec node --check {} \\;",
+    "validate:context": "node validation/context.js",
+    "validate:generation": "node validation/sqlGeneration.js",
+    "validate:sqlite": "node validation/sqliteExecution.js",
+    "validate:postgres": "node validation/postgresExecution.js",
+    "validate:mysql": "node validation/mysqlExecution.js",
+    "validate:local": "npm run validate:context && npm run validate:generation && npm run validate:sqlite",
+    "validate:database": "npm run validate:postgres && npm run validate:mysql",
+    "validate:all": "npm run validate:local && npm run validate:database",
+    "test": "npm run check && npm run validate:local"
   },
   "keywords": [],
   "author": "",
