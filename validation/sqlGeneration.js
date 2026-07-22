@@ -1,50 +1,16 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
 import { analyzeCsv } from '../src/index.js';
+import {
+  assert,
+  assertContains,
+  assertDoesNotContain,
+  createCsvValidationFixture,
+  removeValidationDirectory,
+} from './utilities.js';
 
-function assert(condition, message) {
-  if (!condition) {
-    throw new Error(message);
-  }
-}
-
-function assertContains(sql, fragment, dialect) {
-  assert(
-    sql.includes(fragment),
-    `${dialect} SQL did not contain: ${fragment}\n\n${sql}`,
-  );
-}
-
-function assertDoesNotContain(sql, fragment, dialect) {
-  assert(
-    !sql.includes(fragment),
-    `${dialect} SQL unexpectedly contained: ${fragment}\n\n${sql}`,
-  );
-}
-
-const temporaryDirectory = await mkdtemp(
-  path.join(os.tmpdir(), 'csvreader-validation-'),
-);
-
-const csvFilePath = path.join(
-  temporaryDirectory,
-  'dialect-sample.csv',
-);
+const {temporaryDirectory, csvFilePath} =
+  await createCsvValidationFixture({ directoryPrefix: 'csvreader-validation-', fileName: 'dialect-sample.csv' });
 
 try {
-  const csv = [
-    'id,amount,active,created_at,description',
-    '1,12.50,true,2026-07-21T12:00:00Z,Alpha',
-    '2,7.25,false,2026-07-22T13:30:00Z,Beta',
-  ].join('\n');
-
-  await writeFile(
-    csvFilePath,
-    csv,
-    'utf8',
-  );
-
   const postgresResult = await analyzeCsv(
     csvFilePath,
     {
@@ -186,11 +152,5 @@ try {
 
   console.log('SQL dialect generation passed');
 } finally {
-  await rm(
-    temporaryDirectory,
-    {
-      recursive: true,
-      force: true,
-    },
-  );
+  await removeValidationDirectory(temporaryDirectory);
 }
