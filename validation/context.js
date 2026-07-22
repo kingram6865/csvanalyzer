@@ -56,4 +56,25 @@ try {
   console.log('Unknown context validation passed');
 }
 
+try {
+  new SqlExecutor({
+    contexts: {
+      broken: null,
+    },
+  }).setContext('broken');
+
+  throw new Error('Malformed context validation did not run.');
+} catch (error) {
+  if (
+    !(error instanceof Error) ||
+    error.message !==
+      'Database context "broken" ' +
+      'does not define a valid context object.'
+  ) {
+    throw error;
+  }
+
+  console.log('Malformed context validation passed');
+}
+
 console.log('Context selection passed');
