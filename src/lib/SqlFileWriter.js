@@ -3,10 +3,8 @@ import path from 'node:path';
 
 export class SqlFileWriter {
   async write(sql, outputPath) {
-    if (!sql) {
-      throw new Error(
-        'SQL cannot be written because no SQL was generated.',
-      );
+    if (typeof sql !== 'string' || sql.trim().length === 0) {
+      throw new Error('SQL cannot be written because no SQL was generated.');
     }
 
     const normalizedPath =
