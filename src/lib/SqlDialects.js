@@ -1,43 +1,10 @@
+import { fitsRange, suggestedVarcharLength, renderColumn } from './utilities.js';
+
 const MYSQL_INT_MIN = -2147483648n;
 const MYSQL_INT_MAX = 2147483647n;
 
 const SIGNED_BIGINT_MIN = -9223372036854775808n;
 const SIGNED_BIGINT_MAX = 9223372036854775807n;
-
-function fitsRange(column, minimum, maximum) {
-  if (column.minValue === null || column.maxValue === null) {
-    return false;
-  }
-
-  return (
-    BigInt(column.minValue) >= minimum &&
-    BigInt(column.maxValue) <= maximum
-  );
-}
-
-function suggestedVarcharLength(maxLength) {
-  if (maxLength === 0) {
-    return null;
-  }
-
-  const sizes = [16, 32, 64, 128, 255];
-
-  return sizes.find((size) => maxLength <= size) ?? null;
-}
-
-function renderColumn({
-  identifier,
-  dataType,
-  nullableCandidate,
-  inferNotNull,
-}) {
-  const nullConstraint =
-    inferNotNull && !nullableCandidate
-      ? ' NOT NULL'
-      : '';
-
-  return `  ${identifier} ${dataType}${nullConstraint}`;
-}
 
 export class MySqlDialect {
   quoteIdentifier(identifier) {
@@ -49,13 +16,7 @@ export class MySqlDialect {
       return 'INTEGER';
     }
 
-    if (
-      fitsRange(
-        column,
-        SIGNED_BIGINT_MIN,
-        SIGNED_BIGINT_MAX,
-      )
-    ) {
+    if (fitsRange(column, SIGNED_BIGINT_MIN, SIGNED_BIGINT_MAX)) {
       return 'BIGINT';
     }
 
@@ -68,10 +29,7 @@ export class MySqlDialect {
 
   mapString(column) {
     const length = suggestedVarcharLength(column.maxLength);
-
-    return length === null
-      ? 'TEXT'
-      : `VARCHAR(${length})`;
+    return length === null ? 'TEXT' : `VARCHAR(${length})`;
   }
 
   mapType(column) {
@@ -83,13 +41,9 @@ export class MySqlDialect {
         return this.mapInteger(column);
 
       case 'decimal':
-        if (
-          column.precision <= 65 &&
-          column.scale <= 30
-        ) {
+        if (column.precision <= 65 && column.scale <= 30) {
           return `DECIMAL(${column.precision}, ${column.scale})`;
         }
-
         return 'TEXT';
 
       case 'float':
@@ -104,9 +58,7 @@ export class MySqlDialect {
          * Keep timezone-bearing or mixed values as text unless an
          * import transformation is added.
          */
-        return column.timezoneMode === 'none'
-          ? 'DATETIME'
-          : 'VARCHAR(40)';
+        return column.timezoneMode === 'none' ? 'DATETIME' : 'VARCHAR(40)';
 
       case 'string':
       default:
@@ -114,11 +66,7 @@ export class MySqlDialect {
     }
   }
 
-  createTable({
-    tableName,
-    columns,
-    inferNotNull = false,
-  }) {
+  createTable({ tableName, columns, inferNotNull = false }) {
     const definitions = columns.map((column) =>
       renderColumn({
         identifier: this.quoteIdentifier(column.name),
@@ -128,11 +76,7 @@ export class MySqlDialect {
       }),
     );
 
-    return [
-      `CREATE TABLE ${this.quoteIdentifier(tableName)} (`,
-      definitions.join(',\n'),
-      ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;',
-    ].join('\n');
+    return [`CREATE TABLE ${this.quoteIdentifier(tableName)} (`, definitions.join(',\n'), ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;', ].join('\n');
   }
 }
 
@@ -146,13 +90,7 @@ export class PostgresDialect {
       return 'INTEGER';
     }
 
-    if (
-      fitsRange(
-        column,
-        SIGNED_BIGINT_MIN,
-        SIGNED_BIGINT_MAX,
-      )
-    ) {
+    if (fitsRange(column, SIGNED_BIGINT_MIN, SIGNED_BIGINT_MAX)) {
       return 'BIGINT';
     }
 
@@ -161,10 +99,7 @@ export class PostgresDialect {
 
   mapString(column) {
     const length = suggestedVarcharLength(column.maxLength);
-
-    return length === null
-      ? 'TEXT'
-      : `VARCHAR(${length})`;
+    return length === null ? 'TEXT' : `VARCHAR(${length})`;
   }
 
   mapType(column) {
@@ -201,11 +136,7 @@ export class PostgresDialect {
     }
   }
 
-  createTable({
-    tableName,
-    columns,
-    inferNotNull = false,
-  }) {
+  createTable({ tableName, columns, inferNotNull = false }) {
     const definitions = columns.map((column) =>
       renderColumn({
         identifier: this.quoteIdentifier(column.name),
@@ -215,10 +146,76 @@ export class PostgresDialect {
       }),
     );
 
+    return [`CREATE TABLE ${this.quoteIdentifier(tableName)} (`, definitions.join(',\n'), ');', ].join('\n');
+  }
+}
+
+export class SqliteDialect {
+  quoteIdentifier(identifier) {
+    return `"${String(identifier).replaceAll('"', '""')}"`;
+  }
+
+  mapInteger(column) {
+    if (
+      fitsRange(
+        column,
+        SIGNED_BIGINT_MIN,
+        SIGNED_BIGINT_MAX,
+      )
+    ) {
+      return 'INTEGER';
+    }
+
+    return 'TEXT';
+  }
+
+  mapType(column) {
+    switch (column.inferredType) {
+      // SQLite has no separate BOOLEAN storage class.
+      // Boolean values are stored as integers.
+      case 'boolean':
+        return 'INTEGER';
+
+      case 'integer':
+        return this.mapInteger(column);
+
+      // NUMERIC affinity communicates the intended decimal shape.
+      // SQLite does not enforce precision and scale declarations.
+      case 'decimal':
+        return (
+          `NUMERIC(` +
+          `${column.precision}, ` +
+          `${column.scale})`
+        );
+
+      case 'float':
+        return 'REAL';
+
+      // SQLite has no dedicated DATE or DATETIME storage class.
+      // Retaining ISO-formatted values as TEXT avoids silent timezone
+      // or formatting transformations.
+      case 'date':
+      case 'datetime':
+        return 'TEXT';
+
+      case 'string':
+      default:
+        return 'TEXT';
+    }
+  }
+
+  createTable({ tableName, columns, inferNotNull = false }) {
+    const definitions = columns.map(
+      (column) =>
+        renderColumn({
+          identifier: this.quoteIdentifier(column.name),
+          dataType: this.mapType(column),
+          nullableCandidate: column.nullableCandidate,
+          inferNotNull,
+        }),
+    );
+
     return [
-      `CREATE TABLE ${this.quoteIdentifier(tableName)} (`,
-      definitions.join(',\n'),
-      ');',
-    ].join('\n');
+      `CREATE TABLE ${this.quoteIdentifier(tableName)} (`,definitions.join(',\n'),');',].join('\n');
   }
 }
