@@ -109,7 +109,7 @@ export function parseArguments(args) {
 export function requireConnectionValues(contextName, connection, requiredProperties) {
   if ( !connection || typeof connection !== 'object' || Array.isArray(connection)) {
     throw new Error(
-      `Database context "${contextName}"\ndoes not define a connection object.`);
+      `Database context "${contextName}" does not define a connection object.`);
   }
 
   const missingProperties = requiredProperties.filter(
@@ -151,4 +151,42 @@ export function validateSql(sql) {
   if (typeof sql !== 'string' || sql.trim().length === 0) {
     throw new Error('SQL execution requires a non-empty SQL string.');
   }
+}
+
+export function normalizeIdentifier(value, fallback) {
+  const normalized = String(value ?? '')
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase();
+
+  const identifier = normalized || fallback;
+
+  return /^\d/.test(identifier)
+    ? `column_${identifier}`
+    : identifier;
+}
+
+export function createUniqueColumnNames(headers) {
+  const usedNames = new Set();
+
+  return headers.map((header, index) => {
+    const baseName = normalizeIdentifier(
+      header,
+      `column_${index + 1}`,
+    );
+
+    let candidate = baseName;
+    let suffix = 2;
+
+    while (usedNames.has(candidate)) {
+      candidate = `${baseName}_${suffix}`;
+      suffix += 1;
+    }
+
+    usedNames.add(candidate);
+
+    return candidate;
+  });
 }
