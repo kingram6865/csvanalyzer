@@ -41,19 +41,13 @@ function createUniqueColumnNames(headers) {
 }
 
 export class CsvSchemaAnalyzer {
-  constructor({
-    reader,
-    inferer,
-    dialects,
-  }) {
+  constructor({ reader, inferer, dialects }) {
     this.reader = reader;
     this.inferer = inferer;
     this.dialects = dialects;
   }
 
-  async analyze(
-    filePath,
-    {
+  async analyze(filePath, {
       dialect = null,
       tableName = null,
       maxRows = Infinity,
@@ -112,9 +106,11 @@ export class CsvSchemaAnalyzer {
       const sqlDialect = this.dialects[dialect];
 
       if (!sqlDialect) {
+        const supportedDialects = Object.keys(this.dialects).join(', ');
+
         throw new Error(
           `Unsupported SQL dialect: ${dialect}. ` +
-          'Supported values are mysql and postgres.',
+          `Supported values are ${supportedDialects}.`,
         );
       }
 
