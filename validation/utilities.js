@@ -14,6 +14,30 @@ export function assert(condition,message) {
   }
 }
 
+export function assertContains(
+  sql,
+  fragment,
+  dialect,
+) {
+  assert(
+    sql.includes(fragment),
+    `${dialect} SQL did not contain: ` +
+      `${fragment}\n\n${sql}`,
+  );
+}
+
+export function assertDoesNotContain(
+  sql,
+  fragment,
+  dialect,
+) {
+  assert(
+    !sql.includes(fragment),
+    `${dialect} SQL unexpectedly contained: ` +
+      `${fragment}\n\n${sql}`,
+  );
+}
+
 export async function createCsvValidationFixture({
   directoryPrefix,
   fileName,
