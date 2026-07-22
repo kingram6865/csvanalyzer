@@ -66,9 +66,7 @@ export class CsvSchemaAnalyzer {
     let sql = null;
 
     if (dialect !== null) {
-      const sqlDialect = this.dialects[dialect];
-
-      if (!sqlDialect) {
+      if (!Object.hasOwn(this.dialects, dialect)) {
         const supportedDialects = Object.keys(this.dialects).join(', ');
 
         throw new Error(
@@ -76,6 +74,8 @@ export class CsvSchemaAnalyzer {
           `Supported values are ${supportedDialects}.`,
         );
       }
+
+      const sqlDialect = this.dialects[dialect];
 
       sql = sqlDialect.createTable({
         tableName: normalizedTableName,
