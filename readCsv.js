@@ -1,4 +1,5 @@
-import { analyzeCsv, SqlExecutor } from './src/index.js';
+import { analyzeCsv } from './src/index.js';
+import { SqlExecutor } from './src/lib/SqlExecutor.js';
 import { parseArguments } from './src/lib/utilities.js';
 
 const usage =
