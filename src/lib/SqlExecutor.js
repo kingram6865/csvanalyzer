@@ -41,6 +41,17 @@ export class SqlExecutor {
 
     const context = this.contexts[selectedContextName];
 
+    if (
+      !context ||
+      typeof context !== 'object' ||
+      Array.isArray(context)
+    ) {
+      throw new Error(
+        `Database context "${selectedContextName}" ` +
+        'does not define a valid context object.',
+      );
+    }
+
     // Validate the dialect contained in the context
     if (!SUPPORTED_DIALECTS.has(context.dialect)) {
       throw new Error(
