@@ -1,95 +1,34 @@
-// [ADDED]
-// Temporary filesystem utilities keep the validation CSV outside
-// the repository.
-import {
-  mkdtemp,
-  rm,
-  writeFile,
-} from 'node:fs/promises';
-
-import os from 'node:os';
-import path from 'node:path';
-
-// [ADDED]
-// pg-promise is used independently after SqlExecutor runs so the
-// validation can confirm the table was actually created.
 import pgPromise from 'pg-promise';
-
+import { databaseContexts } from '../src/config/databaseContexts.js';
+import { analyzeCsv } from '../src/index.js';
+import { SqlExecutor } from '../src/lib/SqlExecutor.js';
+import { buildServerConnectionConfig } from '../src/lib/utilities.js';
 import {
-  databaseContexts,
-} from '../src/config/databaseContexts.js';
+  assert,
+  createCsvValidationFixture,
+  createValidationTableName,
+  removeValidationDirectory,
+} from './utilities.js';
 
-import {
-  analyzeCsv,
-} from '../src/index.js';
+const validationTableName = createValidationTableName('csvreader_pg_validation');
 
-import {
-  SqlExecutor,
-} from '../src/lib/SqlExecutor.js';
-
-import {
-  buildServerConnectionConfig,
-} from '../src/lib/utilities.js';
-
-// [ADDED]
-// Small assertion helper that reports the exact failed condition.
-function assert(condition, message) {
-  if (!condition) {
-    throw new Error(message);
-  }
-}
-
-// [ADDED]
-// Create a unique table name so the validation does not collide with
-// an existing database table or another validation run.
-const validationTableName =
-  `csvreader_pg_validation_` +
-  `${process.pid}_${Date.now()}`;
-
-const temporaryDirectory = await mkdtemp(
-  path.join(
-    os.tmpdir(),
-    'csvreader-postgres-validation-',
-  ),
-);
-
-const csvFilePath = path.join(
+const {
   temporaryDirectory,
-  'postgres-executor-sample.csv',
-);
+  csvFilePath,
+} = await createCsvValidationFixture({
+  directoryPrefix:
+    'csvreader-postgres-validation-',
+  fileName:
+    'postgres-executor-sample.csv',
+});
 
-// [ADDED]
-// These variables remain available to the finally block so database
-// and filesystem cleanup runs after both success and failure.
 let sqlExecutor = null;
 let pgp = null;
 let database = null;
 let tableCreated = false;
 
 try {
-  // [ADDED]
-  // Exercise integer, decimal, boolean, timezone-aware datetime,
-  // and string generation.
-  const csv = [
-    'id,amount,active,created_at,description',
-    '1,12.50,true,2026-07-21T12:00:00Z,Alpha',
-    '2,7.25,false,2026-07-22T13:30:00Z,Beta',
-  ].join('\n');
-
-  await writeFile(
-    csvFilePath,
-    csv,
-    'utf8',
-  );
-
-  // [ADDED]
-  // Select the actual postgres context defined in:
-  //
-  //   src/config/databaseContexts.js
-  //
-  // This validates the PostgreSQL values loaded from .env.
-  sqlExecutor = new SqlExecutor()
-    .setContext('postgres');
+  sqlExecutor = new SqlExecutor().setContext('postgres');
 
   assert(
     sqlExecutor.getDialect() === 'postgres',
@@ -262,13 +201,7 @@ try {
     );
   }
 
-  // [ADDED]
-  // Remove the temporary CSV and directory.
-  await rm(
+  await removeValidationDirectory(
     temporaryDirectory,
-    {
-      recursive: true,
-      force: true,
-    },
   );
 }
