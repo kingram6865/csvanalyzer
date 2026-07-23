@@ -1,3 +1,5 @@
+// [ADDED]
+import { assert } from './utilities.js';
 import { SqlExecutor } from '../src/lib/SqlExecutor.js';
 
 const contexts = {
@@ -38,18 +40,10 @@ for (const [contextName, expectedDialect] of [
 }
 
 try {
-  new SqlExecutor({ contexts })
-    .setContext('missing');
-
-  throw new Error(
-    'Unknown context validation did not run.',
-  );
+  new SqlExecutor({ contexts }).setContext('missing');
+  throw new Error('Unknown context validation did not run.');
 } catch (error) {
-  if (
-    !error.message.startsWith(
-      'Unknown database context',
-    )
-  ) {
+  if (!error.message.startsWith('Unknown database context')) {
     throw error;
   }
 
@@ -57,12 +51,7 @@ try {
 }
 
 try {
-  new SqlExecutor({
-    contexts: {
-      broken: null,
-    },
-  }).setContext('broken');
-
+  new SqlExecutor({ contexts: { broken: null } }).setContext('broken');
   throw new Error('Malformed context validation did not run.');
 } catch (error) {
   if (
