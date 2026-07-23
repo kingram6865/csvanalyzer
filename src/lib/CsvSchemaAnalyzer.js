@@ -18,6 +18,14 @@ export class CsvSchemaAnalyzer {
       maximumExamples = 3,
     } = {},
   ) {
+    if (maxRows !== Infinity && (!Number.isInteger(maxRows) || maxRows < 0)) {
+      throw new TypeError('maxRows must be Infinity or a non-negative integer.');
+    }
+
+    if (!Number.isInteger(maximumExamples) || maximumExamples < 0) {
+      throw new TypeError('maximumExamples must be a non-negative integer.');
+    }
+
     let profilers = [];
 
     const readResult = await this.reader.read(
