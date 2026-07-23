@@ -1,77 +1,22 @@
-// [ADDED]
-// Temporary filesystem utilities keep this validation isolated from
-// the project and from the SQLITEDB configured in .env.
-import {
-  mkdtemp,
-  rm,
-  writeFile,
-} from 'node:fs/promises';
-
-import os from 'node:os';
 import path from 'node:path';
-
-// [ADDED]
-// better-sqlite3 is used after SqlExecutor completes so the validation
-// can independently confirm that the table was actually created.
 import Database from 'better-sqlite3';
-
-// [ADDED]
-// analyzeCsv() generates the SQLite CREATE TABLE statement.
 import { analyzeCsv } from '../src/index.js';
-
-// [ADDED]
-// SqlExecutor is imported directly from its owning module.
 import { SqlExecutor } from '../src/lib/SqlExecutor.js';
+import {
+  assert,
+  createCsvValidationFixture,
+  removeValidationDirectory,
+} from './utilities.js';
 
-// [ADDED]
-// Small assertion helper that reports a precise validation failure.
-function assert(condition, message) {
-  if (!condition) {
-    throw new Error(message);
-  }
-}
+const { temporaryDirectory, csvFilePath } = await createCsvValidationFixture({
+  directoryPrefix: 'csvreader-sqlite-validation-',
+  fileName: 'executor-sample.csv',
+});
 
-// [ADDED]
-// Create an isolated temporary directory for both the CSV and SQLite
-// database file.
-const temporaryDirectory = await mkdtemp(
-  path.join(
-    os.tmpdir(),
-    'csvreader-sqlite-validation-',
-  ),
-);
-
-const csvFilePath = path.join(
-  temporaryDirectory,
-  'executor-sample.csv',
-);
-
-const sqliteFilePath = path.join(
-  temporaryDirectory,
-  'executor-validation.sqlite',
-);
+const sqliteFilePath = path.join(temporaryDirectory, 'executor-validation.sqlite');
 
 try {
-  // [ADDED]
-  // The sample exercises integer, decimal, boolean, datetime, and
-  // string SQL generation.
-  const csv = [
-    'id,amount,active,created_at,description',
-    '1,12.50,true,2026-07-21T12:00:00Z,Alpha',
-    '2,7.25,false,2026-07-22T13:30:00Z,Beta',
-  ].join('\n');
-
-  await writeFile(
-    csvFilePath,
-    csv,
-    'utf8',
-  );
-
-  // [ADDED]
-  // Generate SQLite-compatible SQL from the temporary CSV.
-  const result = await analyzeCsv(
-    csvFilePath,
-    {
+  const result = await analyzeCsv(csvFilePath, {
       dialect: 'sqlite',
       inferNotNull: true,
     },
@@ -79,13 +24,10 @@ try {
 
   assert(
     typeof result.sql === 'string' &&
-      result.sql.length > 0,
+      result.sql.trim().length > 0,
     'SQLite SQL was not generated.',
   );
 
-  // [ADDED]
-  // Use a custom named context so this validation does not depend on
-  // SQLITEDB or any other .env value.
   const contexts = {
     localValidation: {
       dialect: 'sqlite',
@@ -96,44 +38,18 @@ try {
     },
   };
 
-  const sqlExecutor = new SqlExecutor({
-    contexts,
-  }).setContext('localValidation');
+  const sqlExecutor = new SqlExecutor({contexts,}).setContext('localValidation');
 
-  assert(
-    sqlExecutor.getDialect() === 'sqlite',
-    'SQLite validation context returned the wrong dialect.',
-  );
+  assert(sqlExecutor.getDialect() === 'sqlite', 'SQLite validation context returned the wrong dialect.');
 
-  // [ADDED]
-  // Execute the generated CREATE TABLE statement.
-  const execution = await sqlExecutor.execute(
-    result.sql,
-  );
+  const execution = await sqlExecutor.execute(result.sql);
 
-  assert(
-    execution.contextName === 'localValidation',
-    'Execution returned the wrong context name.',
-  );
+  assert(execution.contextName === 'localValidation', 'Execution returned the wrong context name.');
+  assert(execution.dialect === 'sqlite', 'Execution returned the wrong dialect.');
 
-  assert(
-    execution.dialect === 'sqlite',
-    'Execution returned the wrong dialect.',
-  );
-
-  // [ADDED]
-  // Reopen the database independently after SqlExecutor has closed
-  // its own connection.
-  const database = new Database(
-    sqliteFilePath,
-    {
-      readonly: true,
-    },
-  );
+  const database = new Database( sqliteFilePath, { readonly: true } );
 
   try {
-    // [ADDED]
-    // Confirm that the expected table exists.
     const table = database
       .prepare(
         `
@@ -150,50 +66,61 @@ try {
       `SQLite table "${result.tableName}" was not created.`,
     );
 
-    // [ADDED]
-    // Confirm the generated table contains the expected columns.
     const columns = database
       .prepare(
         `PRAGMA table_info("${result.tableName}")`,
       )
       .all();
 
-    const columnTypes = Object.fromEntries(
+    const columnDefinitions = Object.fromEntries(
       columns.map((column) => [
         column.name,
-        column.type,
+        {
+          type: column.type,
+          notNull: column.notnull,
+        },
       ]),
     );
 
     assert(
-      columnTypes.id === 'INTEGER',
+      columnDefinitions.id?.type === 'INTEGER',
       `Expected id to be INTEGER, received ` +
-        `"${columnTypes.id}".`,
+        `"${columnDefinitions.id?.type}".`,
     );
 
     assert(
-      columnTypes.amount.startsWith('NUMERIC'),
+      columnDefinitions.amount?.type?.startsWith('NUMERIC'),
       `Expected amount to use NUMERIC affinity, received ` +
-        `"${columnTypes.amount}".`,
+        `"${columnDefinitions.amount?.type}".`,
     );
 
     assert(
-      columnTypes.active === 'INTEGER',
+      columnDefinitions.active?.type === 'INTEGER',
       `Expected active to be INTEGER, received ` +
-        `"${columnTypes.active}".`,
+        `"${columnDefinitions.active?.type}".`,
     );
 
     assert(
-      columnTypes.created_at === 'TEXT',
+      columnDefinitions.created_at?.type === 'TEXT',
       `Expected created_at to be TEXT, received ` +
-        `"${columnTypes.created_at}".`,
+        `"${columnDefinitions.created_at?.type}".`,
     );
 
     assert(
-      columnTypes.description === 'TEXT',
+      columnDefinitions.description?.type === 'TEXT',
       `Expected description to be TEXT, received ` +
-        `"${columnTypes.description}".`,
+        `"${columnDefinitions.description?.type}".`,
     );
+
+    for (
+      const [columnName, definition]
+      of Object.entries(columnDefinitions)
+    ) {
+      assert(
+        definition.notNull === 1,
+        `Expected "${columnName}" to be NOT NULL.`,
+      );
+    }
   } finally {
     database.close();
   }
@@ -202,14 +129,5 @@ try {
     'SQLite SQL execution passed',
   );
 } finally {
-  // [ADDED]
-  // Remove the temporary CSV, SQLite database, and directory whether
-  // validation succeeds or fails.
-  await rm(
-    temporaryDirectory,
-    {
-      recursive: true,
-      force: true,
-    },
-  );
+  await removeValidationDirectory(temporaryDirectory);
 }
