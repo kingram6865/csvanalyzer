@@ -7,6 +7,10 @@ const SIGNED_BIGINT_MIN = -9223372036854775808n;
 const SIGNED_BIGINT_MAX = 9223372036854775807n;
 
 export class MySqlDialect {
+  getIdentifierMaximumLength() {
+    return 64;
+  }
+
   quoteIdentifier(identifier) {
     return `\`${String(identifier).replaceAll('`', '``')}\``;
   }
@@ -81,6 +85,10 @@ export class MySqlDialect {
 }
 
 export class PostgresDialect {
+  getIdentifierMaximumLength() {
+    return 63;
+  }
+
   quoteIdentifier(identifier) {
     return `"${String(identifier).replaceAll('"', '""')}"`;
   }
@@ -151,6 +159,10 @@ export class PostgresDialect {
 }
 
 export class SqliteDialect {
+  getIdentifierMaximumLength() {
+    return Infinity;
+  }
+
   quoteIdentifier(identifier) {
     return `"${String(identifier).replaceAll('"', '""')}"`;
   }
