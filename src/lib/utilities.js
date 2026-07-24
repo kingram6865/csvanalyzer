@@ -153,40 +153,50 @@ export function validateSql(sql) {
   }
 }
 
-export function normalizeIdentifier(value, fallback) {
-  const normalized = String(value ?? '')
+export function normalizeIdentifier(value, fallback = 'column', maximumLength = Infinity) {
+  const normalizedValue = String(value ?? '')
     .trim()
-    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '_')
     .replace(/^_+|_+$/g, '')
-    .toLowerCase();
+    .replace(/_+/g, '_');
 
-  const identifier = normalized || fallback;
+  const normalizedFallback = String(fallback)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .replace(/_+/g, '_');
 
-  return /^\d/.test(identifier)
-    ? `column_${identifier}`
-    : identifier;
+  let identifier = normalizedValue || normalizedFallback || 'column';
+
+  if (/^[0-9]/.test(identifier)) {
+    identifier = `_${identifier}`;
+  }
+
+  return identifier.slice(0,maximumLength);
 }
 
-export function createUniqueColumnNames(headers) {
+export function createUniqueColumnNames(headers, maximumLength = Infinity) {
   const usedNames = new Set();
 
   return headers.map((header, index) => {
-    const baseName = normalizeIdentifier(
-      header,
-      `column_${index + 1}`,
-    );
+      const baseName = normalizeIdentifier(header, `column_${index + 1}`, maximumLength,);
 
-    let candidate = baseName;
-    let suffix = 2;
+      let columnName = baseName;
+      let duplicateNumber = 2;
 
-    while (usedNames.has(candidate)) {
-      candidate = `${baseName}_${suffix}`;
-      suffix += 1;
-    }
+      while (usedNames.has(columnName)) {
+        const suffix = `_${duplicateNumber}`;
+        const baseMaximumLength = maximumLength === Infinity ? Infinity : maximumLength - suffix.length;
 
-    usedNames.add(candidate);
+        columnName = `${baseName.slice(0, baseMaximumLength, )}${suffix}`;
+        duplicateNumber += 1;
+      }
 
-    return candidate;
-  });
+      usedNames.add(columnName);
+
+      return columnName;
+    },
+  );
 }
