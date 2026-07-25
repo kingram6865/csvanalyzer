@@ -1,4 +1,4 @@
-import { analyzeCsv } from '../src/index.js';
+import { analyzeCsv, createCsvSchemaAnalyzer } from '../src/index.js';
 import {
   assert,
   assertContains,
@@ -170,17 +170,40 @@ try {
 
   console.log('SQLite generation passed');
 
-  try {
-    await analyzeCsv(
-      csvFilePath,
-      {
-        dialect: 'toString',
+  const customDialectAnalyzer = createCsvSchemaAnalyzer({
+    dialects: {
+      custom: {
+        createTable({ tableName }) {
+          return `CUSTOM TABLE ${tableName}`;
+        },
       },
-    );
+    },
+  });
 
-    throw new Error(
-      'Inherited dialect validation did not run.',
-    );
+  const customDialectResult = await customDialectAnalyzer.analyze(
+    identifierCsvFilePath,
+    {
+      dialect: 'custom',
+      tableName: longTableName,
+    },
+  );
+
+  assert(
+    customDialectResult.tableName === longTableName,
+    'Expected a custom dialect without an identifier limit to retain the table name.',
+  );
+
+  assert(
+    customDialectResult.sql === `CUSTOM TABLE ${longTableName}`,
+    'Expected the custom dialect to generate SQL without an identifier-limit method.',
+  );
+
+  console.log('Custom dialect compatibility passed');
+
+  try {
+    await analyzeCsv(csvFilePath, { dialect: 'toString' });
+
+    throw new Error('Inherited dialect validation did not run.');
   } catch (error) {
     if (
       !(error instanceof Error) ||
