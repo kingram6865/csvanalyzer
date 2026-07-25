@@ -28,12 +28,29 @@ export class CsvSchemaAnalyzer {
 
     let profilers = [];
 
+    let sqlDialect = null;
+    let identifierMaximumLength = Infinity;
+
+    if (dialect !== null) {
+      if (!Object.hasOwn(this.dialects, dialect)) {
+        const supportedDialects = Object.keys(this.dialects).join(', ');
+
+        throw new Error(
+          `Unsupported SQL dialect: ${dialect}. ` +
+          `Supported values are ${supportedDialects}.`,
+        );
+      }
+
+  sqlDialect = this.dialects[dialect];
+  identifierMaximumLength = sqlDialect.getIdentifierMaximumLength();
+}
+
+
     const readResult = await this.reader.read(
       filePath,
       {
         onHeaders: (headers) => {
-          const columnNames =
-            createUniqueColumnNames(headers);
+          const columnNames = createUniqueColumnNames(headers, identifierMaximumLength);
 
           profilers = headers.map(
             (sourceName, index) =>
@@ -69,22 +86,12 @@ export class CsvSchemaAnalyzer {
     const normalizedTableName = normalizeIdentifier(
       tableName ?? defaultTableName,
       'imported_data',
+      identifierMaximumLength
     );
 
     let sql = null;
 
     if (dialect !== null) {
-      if (!Object.hasOwn(this.dialects, dialect)) {
-        const supportedDialects = Object.keys(this.dialects).join(', ');
-
-        throw new Error(
-          `Unsupported SQL dialect: ${dialect}. ` +
-          `Supported values are ${supportedDialects}.`,
-        );
-      }
-
-      const sqlDialect = this.dialects[dialect];
-
       sql = sqlDialect.createTable({
         tableName: normalizedTableName,
         columns,
