@@ -1,4 +1,3 @@
-// [ADDED]
 import { assert } from './utilities.js';
 import { SqlExecutor } from '../src/lib/SqlExecutor.js';
 
@@ -27,12 +26,11 @@ for (const [contextName, expectedDialect] of [
 
   const actualDialect = executor.getDialect();
 
-  if (actualDialect !== expectedDialect) {
-    throw new Error(
-      `Context "${contextName}" returned "${actualDialect}" ` +
-      `instead of "${expectedDialect}".`,
-    );
-  }
+  assert(
+    actualDialect === expectedDialect,
+    `Context "${contextName}" returned "${actualDialect}" instead of "${expectedDialect}".`,
+  )
+
 
   console.log(
     `${contextName}: ${actualDialect}`,
