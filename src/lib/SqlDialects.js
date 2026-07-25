@@ -70,6 +70,19 @@ export class MySqlDialect {
     }
   }
 
+  createInsert({ tableName, columns }) {
+    const columnList = columns
+      .map((column) => this.quoteIdentifier(column.name))
+      .join(', ');
+
+    const placeholders = columns.map(() => '?').join(', ');
+
+    return (
+      `INSERT INTO ${this.quoteIdentifier(tableName)} ` +
+      `(${columnList}) VALUES (${placeholders})`
+    );
+  }
+
   createTable({ tableName, columns, inferNotNull = false }) {
     const definitions = columns.map((column) =>
       renderColumn({
@@ -144,6 +157,21 @@ export class PostgresDialect {
     }
   }
 
+  createInsert({ tableName, columns }) {
+    const columnList = columns
+      .map((column) => this.quoteIdentifier(column.name))
+      .join(', ');
+
+    const placeholders = columns
+      .map((_, index) => `$${index + 1}`)
+      .join(', ');
+
+    return (
+      `INSERT INTO ${this.quoteIdentifier(tableName)} ` +
+      `(${columnList}) VALUES (${placeholders})`
+    );
+  }
+
   createTable({ tableName, columns, inferNotNull = false }) {
     const definitions = columns.map((column) =>
       renderColumn({
@@ -214,6 +242,16 @@ export class SqliteDialect {
       default:
         return 'TEXT';
     }
+  }
+
+  createInsert({ tableName, columns }) {
+    const columnList = columns
+      .map((column) => this.quoteIdentifier(column.name))
+      .join(', ');
+
+    const placeholders = columns.map(() => '?').join(', ');
+
+    return (`INSERT INTO ${this.quoteIdentifier(tableName)} ` + `(${columnList}) VALUES (${placeholders})`);
   }
 
   createTable({ tableName, columns, inferNotNull = false }) {
