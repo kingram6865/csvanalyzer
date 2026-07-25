@@ -42,9 +42,10 @@ export class CsvSchemaAnalyzer {
       }
 
       sqlDialect = this.dialects[dialect];
-      identifierMaximumLength = sqlDialect.getIdentifierMaximumLength();
+      if (typeof sqlDialect.getIdentifierMaximumLength === 'function') {
+        identifierMaximumLength = sqlDialect.getIdentifierMaximumLength();
+      }
     }
-
 
     const readResult = await this.reader.read(
       filePath,
