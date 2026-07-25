@@ -41,9 +41,9 @@ export class CsvSchemaAnalyzer {
         );
       }
 
-  sqlDialect = this.dialects[dialect];
-  identifierMaximumLength = sqlDialect.getIdentifierMaximumLength();
-}
+      sqlDialect = this.dialects[dialect];
+      identifierMaximumLength = sqlDialect.getIdentifierMaximumLength();
+    }
 
 
     const readResult = await this.reader.read(
@@ -86,12 +86,12 @@ export class CsvSchemaAnalyzer {
     const normalizedTableName = normalizeIdentifier(
       tableName ?? defaultTableName,
       'imported_data',
-      identifierMaximumLength
+      identifierMaximumLength,
     );
 
     let sql = null;
 
-    if (dialect !== null) {
+    if (sqlDialect !== null) {
       sql = sqlDialect.createTable({
         tableName: normalizedTableName,
         columns,
