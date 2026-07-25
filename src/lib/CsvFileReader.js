@@ -2,12 +2,8 @@ import { createReadStream } from 'node:fs';
 import { parse } from 'csv-parse';
 
 export class CsvFileReader {
-  constructor({
-    encoding = 'utf8',
-    ...parserOptions
-  } = {}) {
+  constructor({ encoding = 'utf8', ...parserOptions } = {}) {
     this.encoding = encoding;
-
     this.parserOptions = {
       bom: true,
       columns: false,
@@ -43,7 +39,7 @@ export class CsvFileReader {
             return value || `column_${index + 1}`;
           });
 
-          visitor.onHeaders(headers);
+          await visitor.onHeaders(headers);
           continue;
         }
 
@@ -51,7 +47,7 @@ export class CsvFileReader {
           break;
         }
 
-        visitor.onRow(record, rowsRead);
+        await visitor.onRow(record, rowsRead);
         rowsRead += 1;
       }
     } finally {
