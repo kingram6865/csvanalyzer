@@ -35,28 +35,16 @@ try {
     'The postgres context returned the wrong dialect.',
   );
 
-  // [ADDED]
-  // Generate SQL using the dialect selected by the database context.
-  const result = await analyzeCsv(
-    csvFilePath,
-    {
+  const result = await analyzeCsv(csvFilePath, {
       dialect: sqlExecutor.getDialect(),
       tableName: validationTableName,
       inferNotNull: true,
     },
   );
 
-  assert(
-    typeof result.sql === 'string' &&
-      result.sql.trim().length > 0,
-    'PostgreSQL SQL was not generated.',
-  );
+  assert(typeof result.sql === 'string' && result.sql.trim().length > 0, 'PostgreSQL SQL was not generated.');
 
-  // [ADDED]
-  // Execute the generated CREATE TABLE statement through SqlExecutor.
-  const execution = await sqlExecutor.execute(
-    result.sql,
-  );
+  const execution = await sqlExecutor.execute(result.sql);
 
   tableCreated = true;
 
@@ -70,9 +58,6 @@ try {
     'Execution returned the wrong dialect.',
   );
 
-  // [ADDED]
-  // Build the same normalized PostgreSQL connection configuration
-  // used by SqlExecutor.
   const postgresContext =
     databaseContexts.postgres;
 
@@ -82,13 +67,9 @@ try {
       postgresContext.connection,
     );
 
-  // [ADDED]
-  // Open an independent PostgreSQL connection for verification.
   pgp = pgPromise();
   database = pgp(connectionConfig);
 
-  // [ADDED]
-  // Confirm the table exists in the active PostgreSQL schema.
   const table = await database.oneOrNone(
     `
       SELECT table_name
@@ -104,8 +85,6 @@ try {
     `PostgreSQL table "${result.tableName}" was not created.`,
   );
 
-  // [ADDED]
-  // Read the generated column definitions from PostgreSQL metadata.
   const columns = await database.any(
     `
       SELECT
@@ -130,8 +109,6 @@ try {
     ]),
   );
 
-  // [ADDED]
-  // Validate the PostgreSQL-specific datatype mappings.
   assert(
     columnDefinitions.id?.dataType === 'integer',
     `Expected id to be integer, received ` +
@@ -165,43 +142,23 @@ try {
       `"${columnDefinitions.description?.dataType}".`,
   );
 
-  // [ADDED]
-  // inferNotNull: true should produce NOT NULL for every populated
-  // sample column.
-  for (
-    const [columnName, definition]
-    of Object.entries(columnDefinitions)
-  ) {
+  for (const [columnName, definition] of Object.entries(columnDefinitions)) {
     assert(
       definition.isNullable === 'NO',
       `Expected "${columnName}" to be NOT NULL.`,
     );
   }
 
-  console.log(
-    'PostgreSQL SQL execution passed',
-  );
+  console.log('PostgreSQL SQL execution passed');
 } finally {
-  // [ADDED]
-  // Close the independent verification pool before using SqlExecutor
-  // for table cleanup.
   if (pgp) {
     pgp.end();
   }
 
-  // [ADDED]
-  // Remove the temporary validation table even when metadata
-  // verification or an assertion fails.
   if (tableCreated && sqlExecutor) {
-    const quotedTableName =
-      `"${validationTableName.replaceAll('"', '""')}"`;
-
-    await sqlExecutor.execute(
-      `DROP TABLE IF EXISTS ${quotedTableName};`,
-    );
+    const quotedTableName = `"${validationTableName.replaceAll('"', '""')}"`;
+    await sqlExecutor.execute(`DROP TABLE IF EXISTS ${quotedTableName};`);
   }
 
-  await removeValidationDirectory(
-    temporaryDirectory,
-  );
+  await removeValidationDirectory(temporaryDirectory);
 }
