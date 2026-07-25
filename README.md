@@ -270,4 +270,5 @@ validation/
   postgresExecution.js
   sqlGeneration.js
   sqliteExecution.js
+  utilities.js
 ```
