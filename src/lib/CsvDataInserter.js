@@ -1,6 +1,6 @@
 import { CsvFileReader } from './CsvFileReader.js';
 
-function convertCsvValue(rawValue, column, dialect) {
+function convertCsvValue(rawValue, column) {
   const originalValue = String(rawValue ?? '');
   const trimmedValue = originalValue.trim();
 
@@ -9,11 +9,7 @@ function convertCsvValue(rawValue, column, dialect) {
   }
 
   if (column.inferredType === 'boolean') {
-    const booleanValue = trimmedValue.toLowerCase() === 'true';
-
-    return dialect === 'sqlite'
-      ? Number(booleanValue)
-      : booleanValue;
+    return trimmedValue.toLowerCase() === 'true' ? 1 : 0;
   }
 
   if (column.inferredType === 'string') {
@@ -32,7 +28,6 @@ export class CsvDataInserter {
     filePath,
     {
       columns,
-      dialect,
       insertRow,
       maxRows = Infinity,
     },
@@ -61,7 +56,7 @@ export class CsvDataInserter {
 
         onRow: async (row) => {
           const values = row.map((value, index) =>
-            convertCsvValue(value, columns[index], dialect),
+            convertCsvValue(value, columns[index]),
           );
 
           await insertRow(values);
