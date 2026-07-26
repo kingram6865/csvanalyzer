@@ -1,6 +1,7 @@
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { analyzeCsv } from '../src/index.js';
+import { CsvDataInserter } from '../src/lib/CsvDataInserter.js';
 import { SqlExecutor } from '../src/lib/SqlExecutor.js';
 import {
   assert,
@@ -28,6 +29,12 @@ try {
     'SQLite SQL was not generated.',
   );
 
+  assert(
+    typeof result.insertSql === 'string' &&
+      result.insertSql.trim().length > 0,
+    'SQLite insert SQL was not generated.',
+  );
+
   const contexts = {
     localValidation: {
       dialect: 'sqlite',
@@ -42,10 +49,34 @@ try {
 
   assert(sqlExecutor.getDialect() === 'sqlite', 'SQLite validation context returned the wrong dialect.');
 
-  const execution = await sqlExecutor.execute(result.sql);
+  const csvDataInserter = new CsvDataInserter();
+
+  const execution = await sqlExecutor.executeImport({
+    createTableSql: result.sql,
+    insertSql: result.insertSql,
+    insertRows: (insertRow) =>
+      csvDataInserter.insert(csvFilePath, {
+        columns: result.columns,
+        insertRow,
+        maxRows: Infinity,
+      }),
+  });
 
   assert(execution.contextName === 'localValidation', 'Execution returned the wrong context name.');
   assert(execution.dialect === 'sqlite', 'Execution returned the wrong dialect.');
+
+  assert(
+    execution.rowsRead === 2,
+    `Expected 2 CSV rows to be read, received ` +
+      `${execution.rowsRead}.`,
+  );
+
+  assert(
+    execution.rowsInserted === 2,
+    `Expected 2 CSV rows to be inserted, received ` +
+      `${execution.rowsInserted}.`,
+  );
+
 
   const database = new Database( sqliteFilePath, { readonly: true } );
 
@@ -112,15 +143,50 @@ try {
         `"${columnDefinitions.description?.type}".`,
     );
 
-    for (
-      const [columnName, definition]
-      of Object.entries(columnDefinitions)
-    ) {
-      assert(
-        definition.notNull === 1,
-        `Expected "${columnName}" to be NOT NULL.`,
-      );
+    for (const [columnName, definition] of Object.entries(columnDefinitions)) {
+      assert(definition.notNull === 1, `Expected "${columnName}" to be NOT NULL.`);
     }
+
+    const rows = database
+      .prepare(
+        `
+          SELECT
+            id,
+            amount,
+            active,
+            created_at,
+            description
+          FROM "${result.tableName}"
+          ORDER BY id
+        `,
+      )
+      .all();
+
+    const expectedRows = [
+      {
+        id: 1,
+        amount: 12.5,
+        active: 1,
+        created_at: '2026-07-21T12:00:00Z',
+        description: 'Alpha',
+      },
+      {
+        id: 2,
+        amount: 7.25,
+        active: 0,
+        created_at: '2026-07-22T13:30:00Z',
+        description: 'Beta',
+      },
+    ];
+
+    assert(
+      JSON.stringify(rows) === JSON.stringify(expectedRows),
+      `SQLite inserted rows did not match the CSV data.\n` +
+        `Expected: ${JSON.stringify(expectedRows)}\n` +
+        `Received: ${JSON.stringify(rows)}`,
+    );
+
+
   } finally {
     database.close();
   }
