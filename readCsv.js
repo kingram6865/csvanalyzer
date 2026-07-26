@@ -1,4 +1,5 @@
 import { analyzeCsv } from './src/index.js';
+import { CsvDataInserter } from './src/lib/CsvDataInserter.js';
 import { SqlExecutor } from './src/lib/SqlExecutor.js';
 import { parseArguments } from './src/lib/utilities.js';
 
@@ -65,12 +66,20 @@ try {
   }
 
   if (sqlExecutor) {
-    const execution = await sqlExecutor.execute(result.sql);
+    const csvDataInserter = new CsvDataInserter();
+    const execution = await sqlExecutor.executeImport({
+      createTableSql: result.sql,
+      insertSql: result.insertSql,
+      insertRows: (insertRow) =>
+        csvDataInserter.insert(csvFilePath, {
+          columns: result.columns,
+          insertRow,
+          maxRows: Infinity,
+        }),
+    });
 
-    console.log(
-      `Executed SQL using database context ` +
-      `"${execution.contextName}" (${execution.dialect}).`,
-    );
+    console.log(`Executed SQL using database context "${execution.contextName}" (${execution.dialect}).`);
+    console.log(`Inserted ${execution.rowsInserted} of ${execution.rowsRead} CSV rows.`);
   }
 } catch (error) {
   const message =
