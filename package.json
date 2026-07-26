@@ -8,9 +8,10 @@
     "validate:context": "node validation/context.js",
     "validate:generation": "node validation/sqlGeneration.js",
     "validate:sqlite": "node validation/sqliteExecution.js",
+    "validate:cli": "node validation/cliExecution.js",
     "validate:postgres": "node validation/postgresExecution.js",
     "validate:mysql": "node validation/mysqlExecution.js",
-    "validate:local": "npm run validate:context && npm run validate:generation && npm run validate:sqlite",
+    "validate:local": "npm run validate:context && npm run validate:generation && npm run validate:sqlite && npm run validate:cli",
     "validate:database": "npm run validate:postgres && npm run validate:mysql",
     "validate:all": "npm run validate:local && npm run validate:database",
     "test": "npm run check && npm run validate:local"
