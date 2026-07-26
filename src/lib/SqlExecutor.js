@@ -1,5 +1,5 @@
 import { databaseContexts, } from '../config/databaseContexts.js';
-import {buildServerConnectionConfig, requireConnectionValues, validateSql } from './utilities.js';
+import { buildServerConnectionConfig, requireConnectionValues, validateSql } from './utilities.js';
 
 const SUPPORTED_DIALECTS = new Set([ 'postgres', 'mysql', 'sqlite', ]);
 
@@ -106,6 +106,54 @@ export class SqlExecutor {
     return {contextName: this.contextName, dialect: context.dialect, };
   }
 
+  async executeImport({ createTableSql, insertSql, insertRows }) {
+    let insertionResult;
+    const context = this.getSelectedContext();
+
+    validateSql(createTableSql);
+    validateSql(insertSql);
+
+    if (typeof insertRows !== 'function') {
+      throw new TypeError('SQL import requires an insertRows function.');
+    }
+
+    switch (context.dialect) {
+      case 'postgres':
+        insertionResult = await this.executePostgresImport(
+          createTableSql,
+          insertSql,
+          insertRows,
+          context.connection,
+        );
+        break;
+      case 'mysql':
+        insertionResult = await this.executeMySqlImport(
+          createTableSql,
+          insertSql,
+          insertRows,
+          context.connection,
+        );
+        break;
+      case 'sqlite':
+        insertionResult = await this.executeSqliteImport(
+          createTableSql,
+          insertSql,
+          insertRows,
+          context.connection,
+        );
+        break;
+      default:
+        throw new Error(`Unsupported SQL execution dialect: ${context.dialect}.`);
+    }
+
+    return {
+      contextName: this.contextName,
+      dialect: context.dialect,
+      rowsRead: insertionResult.rowsRead,
+      rowsInserted: insertionResult.rowsInserted,
+    };
+  }
+
   // Prevents getDialect() or execute() from being called before setContext().
   getSelectedContext() {
     if (!this.context || !this.contextName) {
@@ -130,32 +178,98 @@ export class SqlExecutor {
      }
   }
 
-   // Executes SQL against MySQL using mysql2's Promise API.
-   async executeMySql(sql, connection) {
+  async executePostgresImport(createTableSql, insertSql, insertRows, connection) {
+    const connectionConfig = buildServerConnectionConfig(this.contextName, connection);
+    const pgPromiseModule = await import('pg-promise');
+    const pgPromise = pgPromiseModule.default ?? pgPromiseModule;
+    const pgp = pgPromise();
+    const database = pgp(connectionConfig);
+
+    try {
+      return await database.tx(async (transaction) => {
+        await transaction.none(createTableSql);
+        return insertRows((values) => transaction.none(insertSql, values));
+      });
+    } finally {
+      pgp.end();
+    }
+  }
+
+  // Executes SQL against MySQL using mysql2's Promise API.
+  async executeMySql(sql, connection) {
+  const connectionConfig = buildServerConnectionConfig(this.contextName, connection);
+  const mysqlModule = await import('mysql2/promise');
+  const mysql = mysqlModule.default ?? mysqlModule;
+  const databaseConnection = await mysql.createConnection(connectionConfig);
+
+  try {
+    await databaseConnection.query(sql);
+  } finally {
+    await databaseConnection.end();
+  }
+  }
+
+  async executeMySqlImport(createTableSql, insertSql, insertRows, connection) {
     const connectionConfig = buildServerConnectionConfig(this.contextName, connection);
     const mysqlModule = await import('mysql2/promise');
     const mysql = mysqlModule.default ?? mysqlModule;
     const databaseConnection = await mysql.createConnection(connectionConfig);
 
     try {
-      await databaseConnection.query(sql);
+      await databaseConnection.query(createTableSql);
+      await databaseConnection.beginTransaction();
+
+      try {
+        const result = await insertRows((values) => databaseConnection.execute(insertSql, values));
+        await databaseConnection.commit();
+        return result;
+      } catch(error) {
+        await databaseConnection.rollback();
+        throw error;
+      }
     } finally {
       await databaseConnection.end();
     }
-   }
+  }
 
-   // Executes SQL against the SQLite database file configured by SQLITEDB.
-   async executeSqlite(sql, connection) {
+  // Executes SQL against the SQLite database file configured by SQLITEDB.
+  async executeSqlite(sql, connection) {
+  requireConnectionValues(this.contextName, connection, ['filename']);
+  const sqliteModule = await import('better-sqlite3');
+  const Database = sqliteModule.default;
+  const database = new Database(connection.filename);
+
+  try {
+    // better-sqlite3 executes SQL synchronously through exec().
+    database.exec(sql);
+  } finally {
+    database.close();
+  }
+  }
+
+  async executeSqliteImport(createTableSql, insertSql, insertRows, connection) {
     requireConnectionValues(this.contextName, connection, ['filename']);
     const sqliteModule = await import('better-sqlite3');
     const Database = sqliteModule.default;
     const database = new Database(connection.filename);
 
+    database.exec('BEGIN');
+
     try {
-      // better-sqlite3 executes SQL synchronously through exec().
-      database.exec(sql);
+      database.exec(createTableSql);
+      const insertStatement = database.prepare(insertSql);
+
+      const result = await insertRows((values) => {
+        insertStatement.run(...values);
+      });
+
+      database.exec('COMMIT');
+      return result;
+    } catch(error) {
+      database.exec('ROLLBACK');
+      throw error;
     } finally {
       database.close();
     }
-   }
+  }
 }
