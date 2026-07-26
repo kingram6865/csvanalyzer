@@ -1,6 +1,6 @@
 {
   "name": "csvreader",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "A CSV schema analysis and import utility for PostgreSQL, MySQL, and SQLite.",
   "main": "./src/index.js",
   "scripts": {
