@@ -91,12 +91,18 @@ export class CsvSchemaAnalyzer {
     );
 
     let sql = null;
+    let insertSql = null;
 
     if (sqlDialect !== null) {
       sql = sqlDialect.createTable({
         tableName: normalizedTableName,
         columns,
         inferNotNull,
+      });
+
+      insertSql = sqlDialect.createInsert({
+        tableName: normalizedTableName,
+        columns,
       });
     }
 
@@ -108,6 +114,7 @@ export class CsvSchemaAnalyzer {
       columns,
       dialect,
       sql,
+      insertSql,
     };
   }
 }
