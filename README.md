@@ -8,9 +8,9 @@ It generates a `CREATE TABLE` statement for:
 * MySQL
 * SQLite
 
-The generated SQL can be displayed, written to a `.sql` file, executed against a configured database context, or both written and executed.
+The generated `CREATE TABLE` SQL can be displayed, written to a `.sql` file, executed against a configured database context, or both written and executed.
 
-> `csvreader` currently creates the inferred table structure only. It does not insert the CSV rows into the database.
+When `--execute-sql` is supplied, `csvreader` creates the inferred table and then streams the CSV rows into it using a dialect-specific parameterized `INSERT` statement.
 
 ## Installation
 
@@ -86,10 +86,13 @@ node readCsv.js data/example.csv --execute-sql mysql
 node readCsv.js data/example.csv --execute-sql sqlite
 ```
 
-The selected database context controls both:
+The selected database context controls:
 
 1. The SQL dialect used to generate the `CREATE TABLE` statement.
-2. The database connection used to execute the statement.
+2. The parameterized `INSERT` syntax used for each CSV row.
+3. The database connection used to create and populate the table.
+
+After the import completes, the command reports the number of CSV rows read and inserted.
 
 ### Write and execute the SQL
 
@@ -99,14 +102,16 @@ node readCsv.js data/example.csv \
   --execute-sql postgres
 ```
 
-Writing the SQL file and executing the SQL are independent operations.
+Writing the SQL file and executing the database import are independent operations.
+
+The generated `.sql` file contains the `CREATE TABLE` statement. CSV rows are inserted during execution through parameterized driver statements and are not written to the SQL file.
 
 ## Options
 
 | Option                           | Description                                                             |
 | -------------------------------- | ----------------------------------------------------------------------- |
 | `--write-sql`                    | Write the generated SQL to a `.sql` file.                               |
-| `--execute-sql <context>`        | Execute the generated SQL using a named database context.               |
+| `--execute-sql <context>`        | Create and populate the table using a named database context.           |
 | `--sql-path <directory>`         | Directory where the SQL file should be written. Requires `--write-sql`. |
 | `--sql-file-name <filename.sql>` | Filename for the generated SQL file. Requires `--write-sql`.            |
 
@@ -215,7 +220,7 @@ This runs:
 * Project-wide JavaScript syntax validation
 * Database-context selection validation
 * PostgreSQL, MySQL, and SQLite SQL-generation validation
-* Isolated SQLite execution validation
+* End-to-end SQLite table creation and CSV row insertion validation
 
 The local validation does not require a live PostgreSQL or MySQL server.
 
@@ -238,8 +243,10 @@ These checks use the PostgreSQL and MySQL contexts configured in `.env`.
 Each live validation:
 
 1. Creates a uniquely named temporary table.
-2. Confirms the generated column definitions through database metadata.
-3. Drops the temporary table during cleanup.
+2. Streams the CSV validation fixture into the table.
+3. Confirms the generated column definitions through database metadata.
+4. Verifies the inserted row values and boolean representation.
+5. Drops the temporary table during cleanup.
 
 ### Run the complete validation suite
 
@@ -258,6 +265,7 @@ src/
   lib/
     ColumnProfiler.js
     CsvFileReader.js
+    CsvDataInserter.js
     CsvSchemaAnalyzer.js
     SqlDialects.js
     SqlExecutor.js
