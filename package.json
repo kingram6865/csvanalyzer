@@ -1,7 +1,7 @@
 {
   "name": "csvreader",
   "version": "0.1.0",
-  "description": "A CSV schema analysis utility that infers column types and generates or executes CREATE TABLE SQL for PostgreSQL, MySQL, and SQLite.",
+  "description": "A CSV schema analysis and import utility for PostgreSQL, MySQL, and SQLite.",
   "main": "./src/index.js",
   "scripts": {
     "check": "find . -path \"*/node_modules\" -prune -o -type f -name \"*.js\" -exec node --check {} \\;",
