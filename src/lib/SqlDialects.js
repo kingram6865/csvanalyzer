@@ -76,11 +76,7 @@ export class MySqlDialect {
       .join(', ');
 
     const placeholders = columns.map(() => '?').join(', ');
-
-    return (
-      `INSERT INTO ${this.quoteIdentifier(tableName)} ` +
-      `(${columnList}) VALUES (${placeholders})`
-    );
+    return (`INSERT INTO ${this.quoteIdentifier(tableName)} ` + `(${columnList}) VALUES (${placeholders})`);
   }
 
   createTable({ tableName, columns, inferNotNull = false }) {
@@ -163,7 +159,12 @@ export class PostgresDialect {
       .join(', ');
 
     const placeholders = columns
-      .map((_, index) => `$${index + 1}`)
+      .map((column, index) => {
+        const placeholder = `$${index + 1}`;
+        return column.inferredType === 'boolean'
+          ? `(${placeholder} = 1)`
+          : placeholder;
+      })
       .join(', ');
 
     return (
@@ -222,11 +223,7 @@ export class SqliteDialect {
       // NUMERIC affinity communicates the intended decimal shape.
       // SQLite does not enforce precision and scale declarations.
       case 'decimal':
-        return (
-          `NUMERIC(` +
-          `${column.precision}, ` +
-          `${column.scale})`
-        );
+        return (`NUMERIC(` + `${column.precision}, ` + `${column.scale})`);
 
       case 'float':
         return 'REAL';
@@ -251,7 +248,9 @@ export class SqliteDialect {
 
     const placeholders = columns.map(() => '?').join(', ');
 
-    return (`INSERT INTO ${this.quoteIdentifier(tableName)} ` + `(${columnList}) VALUES (${placeholders})`);
+    return (
+      `INSERT INTO ${this.quoteIdentifier(tableName)} ` +
+      `(${columnList}) VALUES (${placeholders})`);
   }
 
   createTable({ tableName, columns, inferNotNull = false }) {
