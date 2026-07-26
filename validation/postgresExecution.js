@@ -1,6 +1,7 @@
 import pgPromise from 'pg-promise';
 import { databaseContexts } from '../src/config/databaseContexts.js';
 import { analyzeCsv } from '../src/index.js';
+import { CsvDataInserter } from '../src/lib/CsvDataInserter.js';
 import { SqlExecutor } from '../src/lib/SqlExecutor.js';
 import { buildServerConnectionConfig } from '../src/lib/utilities.js';
 import {
@@ -44,28 +45,35 @@ try {
 
   assert(typeof result.sql === 'string' && result.sql.trim().length > 0, 'PostgreSQL SQL was not generated.');
 
-  const execution = await sqlExecutor.execute(result.sql);
+  assert(
+    typeof result.insertSql === 'string' && result.insertSql.trim().length > 0,
+    'PostgreSQL insert SQL was not generated.',
+  );
+
+
+  const csvDataInserter = new CsvDataInserter();
+  const execution = await sqlExecutor.executeImport({
+  createTableSql: result.sql,
+  insertSql: result.insertSql,
+  insertRows: (insertRow) =>
+      csvDataInserter.insert(csvFilePath, {
+        columns: result.columns,
+        insertRow,
+        maxRows: Infinity,
+      }),
+  });
 
   tableCreated = true;
 
-  assert(
-    execution.contextName === 'postgres',
-    'Execution returned the wrong context name.',
-  );
+  assert(execution.contextName === 'postgres', 'Execution returned the wrong context name.');
+  assert(execution.dialect === 'postgres', 'Execution returned the wrong dialect.');
 
-  assert(
-    execution.dialect === 'postgres',
-    'Execution returned the wrong dialect.',
-  );
+  assert(execution.rowsRead === 2, `Expected 2 CSV rows to be read, received ${execution.rowsRead}.`);
+  assert(execution.rowsInserted === 2, `Expected 2 CSV rows to be inserted, received ${execution.rowsInserted}.`);
 
-  const postgresContext =
-    databaseContexts.postgres;
 
-  const connectionConfig =
-    buildServerConnectionConfig(
-      'postgres',
-      postgresContext.connection,
-    );
+  const postgresContext = databaseContexts.postgres;
+  const connectionConfig = buildServerConnectionConfig('postgres', postgresContext.connection);
 
   pgp = pgPromise();
   database = pgp(connectionConfig);
@@ -143,11 +151,49 @@ try {
   );
 
   for (const [columnName, definition] of Object.entries(columnDefinitions)) {
-    assert(
-      definition.isNullable === 'NO',
-      `Expected "${columnName}" to be NOT NULL.`,
-    );
+    assert(definition.isNullable === 'NO', `Expected "${columnName}" to be NOT NULL.`);
   }
+
+  const quotedTableName = `"${result.tableName.replaceAll('"', '""')}"`;
+  const insertedRows = await database.any(
+    `
+      SELECT
+        id,
+        amount::text AS amount,
+        active,
+        to_char(
+          created_at AT TIME ZONE 'UTC',
+          'YYYY-MM-DD"T"HH24:MI:SS"Z"'
+        ) AS created_at,
+        description
+      FROM ${quotedTableName}
+      ORDER BY id
+    `,
+  );
+
+  const expectedRows = [
+    {
+      id: 1,
+      amount: '12.50',
+      active: true,
+      created_at: '2026-07-21T12:00:00Z',
+      description: 'Alpha',
+    },
+    {
+      id: 2,
+      amount: '7.25',
+      active: false,
+      created_at: '2026-07-22T13:30:00Z',
+      description: 'Beta',
+    },
+  ];
+
+  assert(
+    JSON.stringify(insertedRows) === JSON.stringify(expectedRows),
+    `PostgreSQL inserted rows did not match the CSV data.\n` +
+      `Expected: ${JSON.stringify(expectedRows)}\n` +
+      `Received: ${JSON.stringify(insertedRows)}`,
+  );
 
   console.log('PostgreSQL SQL execution passed');
 } finally {
