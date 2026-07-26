@@ -1,6 +1,7 @@
 import mysql from 'mysql2/promise';
 import { databaseContexts } from '../src/config/databaseContexts.js';
 import { analyzeCsv } from '../src/index.js';
+import { CsvDataInserter } from '../src/lib/CsvDataInserter.js';
 import { SqlExecutor } from '../src/lib/SqlExecutor.js';
 import { buildServerConnectionConfig } from '../src/lib/utilities.js';
 import {
@@ -44,9 +45,27 @@ try {
     'MySQL SQL was not generated.',
   );
 
-  const execution = await sqlExecutor.execute(result.sql);
+  assert(
+    typeof result.insertSql === 'string' &&
+      result.insertSql.trim().length > 0,
+    'MySQL insert SQL was not generated.',
+  );
 
+  const csvDataInserter = new CsvDataInserter();
   tableCreated = true;
+
+  const execution = await sqlExecutor.executeImport({
+    createTableSql: result.sql,
+    insertSql: result.insertSql,
+    insertRows: (insertRow) =>
+      csvDataInserter.insert(csvFilePath, {
+        columns: result.columns,
+        insertRow,
+        maxRows: Infinity,
+      }),
+  });
+
+
 
   assert(
     execution.contextName === 'mysql',
@@ -56,6 +75,18 @@ try {
   assert(
     execution.dialect === 'mysql',
     'Execution returned the wrong dialect.',
+  );
+
+  assert(
+    execution.rowsRead === 2,
+    `Expected 2 CSV rows to be read, received ` +
+      `${execution.rowsRead}.`,
+  );
+
+  assert(
+    execution.rowsInserted === 2,
+    `Expected 2 CSV rows to be inserted, received ` +
+      `${execution.rowsInserted}.`,
   );
 
   const mysqlContext = databaseContexts.mysql;
@@ -144,20 +175,62 @@ try {
     );
   }
 
+  const quotedTableName = `\`${result.tableName.replaceAll('`', '``')}\``;
+
+  const [insertedRows] = await databaseConnection.query(
+    `
+      SELECT
+        id,
+        amount,
+        active,
+        created_at,
+        description
+      FROM ${quotedTableName}
+      ORDER BY id
+    `,
+  );
+
+  const expectedRows = [
+    {
+      id: 1,
+      amount: '12.50',
+      active: 1,
+      created_at: '2026-07-21T12:00:00Z',
+      description: 'Alpha',
+    },
+    {
+      id: 2,
+      amount: '7.25',
+      active: 0,
+      created_at: '2026-07-22T13:30:00Z',
+      description: 'Beta',
+    },
+  ];
+
+  assert(
+    JSON.stringify(insertedRows) === JSON.stringify(expectedRows),
+    `MySQL inserted rows did not match the CSV data.\n` +
+      `Expected: ${JSON.stringify(expectedRows)}\n` +
+      `Received: ${JSON.stringify(insertedRows)}`,
+  );
+
   console.log('MySQL SQL execution passed');
 } finally {
+  try {
+    if (tableCreated && databaseConnection) {
+      const quotedTableName = `\`${validationTableName.replaceAll('`', '``')}\``;
+      await databaseConnection.query(`DROP TABLE IF EXISTS ${quotedTableName};`);
+    }
 
-  if (tableCreated && databaseConnection) {
-    const quotedTableName = `\`${validationTableName .replaceAll('`', '``')}\``;
-    await databaseConnection.query(`DROP TABLE IF EXISTS ${quotedTableName};`);
+    if (tableCreated && !databaseConnection && sqlExecutor) {
+      const quotedTableName = `\`${validationTableName.replaceAll('`', '``')}\``;
+      await sqlExecutor.execute(`DROP TABLE IF EXISTS ${quotedTableName};`);
+    }
+  } finally {
+    if (databaseConnection) {
+      await databaseConnection.end();
+    }
+
+    await removeValidationDirectory(temporaryDirectory);
   }
-
-  if (tableCreated && !databaseConnection && sqlExecutor) {
-    const quotedTableName = `\`${validationTableName.replaceAll('`', '``')}\``;
-    await sqlExecutor.execute(`DROP TABLE IF EXISTS ${quotedTableName};`);
-  }
-
-  if (databaseConnection) {await databaseConnection.end();}
-
-  await removeValidationDirectory(temporaryDirectory);
 }
