@@ -28,6 +28,13 @@ try {
   assertContains(postgresResult.sql, '"active" BOOLEAN NOT NULL', 'PostgreSQL',);
   assertContains(postgresResult.sql, '"created_at" TIMESTAMP WITH TIME ZONE NOT NULL', 'PostgreSQL',);
   assertDoesNotContain( postgresResult.sql, 'ENGINE=InnoDB', 'PostgreSQL',);
+  assert(
+    postgresResult.insertSql ===
+      'INSERT INTO "dialect_sample" ' +
+      '("id", "amount", "active", "created_at", "description") ' +
+      'VALUES ($1, $2, ($3 = 1), $4, $5)',
+      'PostgreSQL insert SQL did not use the expected placeholders and boolean conversion.',
+  );
 
   const postgresIdentifierResult = await analyzeCsv(identifierCsvFilePath, { dialect: 'postgres', tableName: longTableName, },);
   const postgresColumnNames = postgresIdentifierResult.columns.map((column) => column.name,);
@@ -48,6 +55,14 @@ try {
   assertContains(mysqlResult.sql, '`active` BOOLEAN NOT NULL', 'MySQL',);
   assertContains(mysqlResult.sql, '`created_at` VARCHAR(40) NOT NULL', 'MySQL',);
   assertContains(mysqlResult.sql, 'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;', 'MySQL',);
+
+  assert(
+    mysqlResult.insertSql ===
+      'INSERT INTO `dialect_sample` ' +
+        '(`id`, `amount`, `active`, `created_at`, `description`) ' +
+      'VALUES (?, ?, ?, ?, ?)',
+      'MySQL insert SQL did not use the expected placeholders.',
+  );
 
   const mysqlIdentifierResult = await analyzeCsv(
     identifierCsvFilePath,
@@ -117,6 +132,14 @@ try {
   assertContains(sqliteResult.sql, '"created_at" TEXT NOT NULL','SQLite',);
   assertDoesNotContain(sqliteResult.sql, 'ENGINE=InnoDB', 'SQLite');
 
+  assert(
+    sqliteResult.insertSql ===
+      'INSERT INTO "dialect_sample" ' +
+      '("id", "amount", "active", "created_at", "description") ' +
+      'VALUES (?, ?, ?, ?, ?)',
+    'SQLite insert SQL did not use the expected placeholders.',
+  );
+
   const sqliteIdentifierResult = await analyzeCsv(
     identifierCsvFilePath,
     {
@@ -176,6 +199,10 @@ try {
         createTable({ tableName }) {
           return `CUSTOM TABLE ${tableName}`;
         },
+
+        createInsert({ tableName }) {
+          return `CUSTOM INSERT ${tableName}`;
+        },
       },
     },
   });
@@ -196,6 +223,12 @@ try {
   assert(
     customDialectResult.sql === `CUSTOM TABLE ${longTableName}`,
     'Expected the custom dialect to generate SQL without an identifier-limit method.',
+  );
+
+  assert(
+    customDialectResult.insertSql ===
+      `CUSTOM INSERT ${longTableName}`,
+    'Expected the custom dialect to generate insert SQL.',
   );
 
   console.log('Custom dialect compatibility passed');
